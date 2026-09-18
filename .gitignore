@@ -1,0 +1,32 @@
+# --- Raw data (never commit; large, re-downloadable from NHTSA) ---
+data/raw/
+*.zip
+
+# --- Processed / generated data & model artifacts ---
+data/processed/
+models/
+artifacts/
+
+# --- Python ---
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+
+# --- Secrets / environment files ---
+.env
+.env.*
+*.key
+
+# --- OS / editor cruft ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# --- Notebook checkpoints ---
+.ipynb_checkpoints/
