@@ -1,0 +1,30 @@
+# ============================================================================
+# SYNTHETIC / DEMO DATA -- NOT REAL EMERGENCY-SERVICE UNITS OR AVAILABILITY.
+#
+# This file is a small, fabricated resource catalog used ONLY to demonstrate
+# the ResQAI Phase 3 resource-engine architecture (loading, filtering,
+# capability matching, and distance-based ranking). Resource IDs, names,
+# coordinates, and availability_status are all illustrative placeholders --
+# none of them represent an actual ambulance, fire unit, police unit, or
+# hospital. Coordinates form a small illustrative grid and are not tied to
+# any real address or jurisdiction. See docs/PHASE3_INTEGRATION.md,
+# "Synthetic resource-data limitation", before using this for anything
+# beyond a prototype demonstration.
+# ============================================================================
+resource_id,resource_type,resource_name,latitude,longitude,availability_status,capacity,service_capabilities,demo_only
+AMB-DEMO-001,ambulance,Demo Ambulance Unit 1,39.0997,-94.5786,available,2,ambulance;trauma_care,true
+AMB-DEMO-002,ambulance,Demo Ambulance Unit 2,39.1210,-94.6100,available,2,ambulance;trauma_care;pediatric_care,true
+AMB-DEMO-003,ambulance,Demo Ambulance Unit 3,39.0500,-94.5300,unavailable,2,ambulance;trauma_care,true
+AMB-DEMO-004,ambulance,Demo Ambulance Unit 4,39.1600,-94.4900,available,2,ambulance,true
+FIRE-DEMO-001,fire_response,Demo Fire Engine 1,39.1050,-94.5900,available,1,fire_response;rescue,true
+FIRE-DEMO-002,fire_response,Demo Fire Engine 2,39.0400,-94.6200,available,1,fire_response;rescue;hazmat_response,true
+FIRE-DEMO-003,fire_response,Demo Fire Engine 3,39.1700,-94.5400,unavailable,1,fire_response,true
+POLICE-DEMO-001,police_response,Demo Patrol Unit 1,39.1000,-94.5700,available,1,police_response;traffic_management,true
+POLICE-DEMO-002,police_response,Demo Patrol Unit 2,39.0700,-94.5000,available,1,police_response;traffic_management,true
+POLICE-DEMO-003,police_response,Demo Patrol Unit 3,39.1400,-94.6300,available,1,police_response,true
+TRAFFIC-DEMO-001,traffic_management,Demo Traffic Control Unit 1,39.0950,-94.5750,available,1,traffic_management,true
+TRAFFIC-DEMO-002,traffic_management,Demo Traffic Control Unit 2,39.2000,-94.5000,available,1,traffic_management,true
+HAZMAT-DEMO-001,hazmat_response,Demo Hazmat Response Team 1,39.0300,-94.5100,available,1,hazmat_response;chemical_spill;fuel_spill,true
+HAZMAT-DEMO-002,hazmat_response,Demo Hazmat Response Team 2,39.1900,-94.6500,unavailable,1,hazmat_response,true
+HOSP-DEMO-001,hospital,Demo General Hospital,39.1100,-94.5800,available,50,hospital;trauma_center,true
+HOSP-DEMO-002,hospital,Demo Community Hospital,39.0600,-94.6400,available,30,hospital,true
