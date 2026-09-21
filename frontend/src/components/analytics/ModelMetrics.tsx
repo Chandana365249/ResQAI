@@ -1,6 +1,6 @@
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { getModelMetrics, type ModelEvaluation, type ModelMetricsEntry } from "../../api";
-import { formatPercent } from "../../lib/format";
+import { getModelMetrics, getModels, type ModelEvaluation, type ModelMetricsEntry } from "../../api";
+import { formatPercent, humanize } from "../../lib/format";
 import { useCachedQuery } from "../../state/useCachedQuery";
 import { Card } from "../common/Card";
 import { EmptyState, ErrorPanel, Spinner } from "../common/Feedback";
@@ -13,6 +13,33 @@ const METRICS: { key: keyof Pick<ModelEvaluation, "accuracy" | "macro_f1" | "mac
   { key: "fatal_class_recall", label: "Fatal-class recall" },
 ];
 const COLORS = ["#0f766e", "#7c3aed"];
+
+/** Role, input-feature count, prediction-source id and limitations, straight from GET /models. */
+function ModelFacts({ sourceIds }: { sourceIds: string[] }) {
+  const info = useCachedQuery("models:info", () => getModels());
+  if (!info.data) return null;
+  const models = info.data.models.filter((m) => sourceIds.includes(m.source_id));
+  return (
+    <div className="grid gap-3 lg:grid-cols-2" aria-label="About these models" role="group">
+      {models.map((m) => (
+        <article key={m.source_id} className="rounded-md border border-slate-200 p-3">
+          <h3 className="text-sm font-semibold text-slate-900">{m.display_name}</h3>
+          <dl className="mt-2 grid grid-cols-2 gap-2 text-sm">
+            <div><dt className="text-xs text-slate-600">Role</dt><dd className="font-medium text-slate-900">{humanize(m.role)}</dd></div>
+            <div><dt className="text-xs text-slate-600">Input features</dt><dd className="font-medium text-slate-900">{m.feature_count}</dd></div>
+            <div className="col-span-2">
+              <dt className="text-xs text-slate-600">Appears in results as</dt>
+              <dd className="font-mono text-xs text-slate-900">{m.source_id}</dd>
+            </div>
+          </dl>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-slate-800">
+            {m.limitations.map((l) => <li key={l}>{l}</li>)}
+          </ul>
+        </article>
+      ))}
+    </div>
+  );
+}
 
 /**
  * Model performance, straight from GET /models/metrics (the backend's stored
@@ -103,6 +130,8 @@ export function ModelMetrics() {
             </p>
             <p className="mt-2 text-xs text-slate-700">{query.data.evaluation_note}</p>
           </div>
+
+          <ModelFacts sourceIds={available.map((m) => m.source_id)} />
         </div>
       );
     }

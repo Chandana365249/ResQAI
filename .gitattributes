@@ -1,0 +1,4 @@
+# Files pinned by SHA-256 in deployment/model_artifacts.json must keep their exact
+# bytes on every platform: no line-ending conversion (this machine uses core.autocrlf=true).
+deployment/model_metadata/*.json -text
+deployment/model_metrics/*.json -text

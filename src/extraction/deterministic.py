@@ -232,11 +232,22 @@ _VEHICLE_YEAR = re.compile(
 
 
 def _extract_vehicle_count(clauses: List[str]) -> ExtractedField[int]:
+    """Only an explicit number ("two cars", "one truck") establishes a vehicle count.
+
+    An indefinite article ("a truck", "an SUV") means "a vehicle is mentioned",
+    NOT "exactly one vehicle was involved": "A car hit a parked vehicle" involves
+    two vehicles, and "a truck collision" does not say how many. Treating "a"
+    as 1 made downstream features (VE_TOTAL, multiple_vehicles = "No") assert
+    something the report never stated, so articles are skipped and the count
+    stays missing. (Vehicle TYPES still record the mention -- see
+    _extract_vehicle_types.)
+    """
     for clause in clauses:
-        match = _VEHICLE_COUNT.search(clause)
-        if match:
+        for match in _VEHICLE_COUNT.finditer(clause):
             token = match.group("num")
-            number = 1 if token in ("a", "an") else word_to_number(token)
+            if token in ("a", "an"):
+                continue
+            number = word_to_number(token)
             if number is None:
                 continue
             value, certainty = classify_match(clause, match.start())

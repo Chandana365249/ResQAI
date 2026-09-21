@@ -1,0 +1,52 @@
+# ResQAI -- Render Blueprint (one repository, two services).
+#
+#   resqai-api : FastAPI backend, built and run from the REPOSITORY ROOT (it needs src/,
+#                data/resources/ and deployment/). Model files are NOT in Git: at startup the
+#                API downloads the versioned release assets and verifies their SHA-256
+#                (deployment/model_artifacts.json). See docs/DEPLOYMENT.md.
+#   resqai-web : the React dashboard, built from frontend/ as a static site.
+#
+# Keys were checked against Render's published schema (https://render.com/schema/render.yaml.json).
+# Values marked `sync: false` are entered in the Render dashboard when the Blueprint is created
+# (they depend on the URLs Render assigns); nothing secret is stored in this file.
+
+services:
+  - type: web
+    name: resqai-api
+    runtime: python
+    plan: free
+    region: oregon
+    autoDeployTrigger: commit
+    buildCommand: pip install -r requirements-api.txt
+    startCommand: uvicorn src.api.main:app --host 0.0.0.0 --port $PORT --no-server-header
+    healthCheckPath: /api/v1/ready   # 503 unless both models are loaded, so a deploy with missing/corrupt models is NOT reported healthy
+    envVars:
+      - key: PYTHON_VERSION          # must be fully qualified; matches .python-version and the trained artifacts
+        value: 3.13.7
+      - key: RESQAI_ENV
+        value: production
+      - key: RESQAI_LOG_LEVEL
+        value: INFO
+      - key: RESQAI_BOOTSTRAP_MODELS # download + verify the pinned model artifacts at startup
+        value: "true"
+      - key: RESQAI_REQUIRE_MODELS   # /ready is NOT_READY unless both models loaded
+        value: "true"
+      - key: RESQAI_ALLOWED_ORIGINS  # the frontend's public origin, e.g. https://<resqai-web>.onrender.com (no trailing slash)
+        sync: false
+
+  - type: web
+    name: resqai-web
+    runtime: static
+    rootDir: frontend
+    autoDeployTrigger: commit
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: NODE_VERSION            # the version the dashboard was built and tested with
+        value: 24.19.0
+      - key: VITE_API_BASE_URL       # the API's public origin, e.g. https://<resqai-api>.onrender.com
+        sync: false
+    routes:
+      - type: rewrite                # SPA fallback so /analytics, /system, ... work on reload
+        source: /*
+        destination: /index.html

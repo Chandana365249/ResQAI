@@ -11,7 +11,7 @@ ResQAI is a **decision-support prototype**. It does not dispatch emergency servi
 
 | | |
 |---|---|
-| API version | `v1` (URL prefix `/api/v1`), application version `0.1.0` (single source: `src/api/config.py`) |
+| API version | `v1` (URL prefix `/api/v1`), application version **1.0.0** (single source: the repository-root `VERSION` file, read by `src/api/config.py`; the frontend footer and the model manifest are checked against it by a test) |
 | Framework | FastAPI 0.141.1 + Uvicorn 0.53.0 (Pydantic v2) |
 | State | Stateless per request. No database. No authentication. |
 
@@ -131,7 +131,10 @@ Configured with `RESQAI_ALLOWED_ORIGINS` (comma-separated). The default allows o
 |---|---|---|
 | `RESQAI_ENV` | `local` | Environment label shown in `/health` |
 | `RESQAI_LOG_LEVEL` | `INFO` | `DEBUG`/`INFO`/`WARNING`/`ERROR`/`CRITICAL` (invalid values fail at startup) |
-| `RESQAI_ALLOWED_ORIGINS` | local dev origins | CORS origins |
+| `RESQAI_ALLOWED_ORIGINS` | local dev origins | CORS origins (a trailing slash is stripped) |
+| `RESQAI_REQUIRE_MODELS` | `false` | Phase 6: when `true`, `/ready` is `NOT_READY` unless **both** severity models are loaded (deployment sets this) |
+| `RESQAI_BOOTSTRAP_MODELS` | `false` | Phase 6: when `true`, verify/download the pinned model artifacts at startup (`deployment/model_artifacts.json`; see `docs/DEPLOYMENT.md`) |
+| `RESQAI_MODEL_ARTIFACT_BASE_URL` | manifest's URL | Phase 6: optional override of the artifact base URL (https; http only for localhost) |
 
 No secrets are required or read. (No `.env.example` is shipped because the repo's `.gitignore` rule `.env.*` would exclude it.)
 
@@ -288,7 +291,7 @@ The report-compatible model is weaker than the historical model on held-out CRSS
 
 | Situation | Result |
 |---|---|
-| Model artifact(s) missing/failed | `/health` = `degraded`; `/ready` still `READY`; `/analyze` = 200 with `ml_prediction.available=false`, rule-based decision/risk/resources intact |
+| Model artifact(s) missing/failed | `/health` = `degraded`; `/ready` still `READY` (**but `NOT_READY` when `RESQAI_REQUIRE_MODELS=true`**, as in deployment); `/analyze` = 200 with `ml_prediction.available=false`, rule-based decision/risk/resources intact |
 | Not enough report information for either model | 200, `prediction_source="none"` |
 | No coordinates | 200, `resources.location.available=false`; resources listed by capability, `distance_km=null` |
 | Resource catalog cannot load | `/health` = `unavailable`; `/ready` = 503 `NOT_READY`; `/analyze` and `/resources` = 503. (Analysis needs the catalog.) The app still starts and retries loading on later calls |
@@ -328,16 +331,20 @@ Two small, additive, backward-compatible changes to the existing core, each with
 
 **Phase 5 addition:** `GET /api/v1/models/metrics` (`src/api/metrics.py`) exposes the evaluation metrics already written to `artifacts/metrics.json` and `artifacts/report_compatible_metrics.json` at training time, so the dashboard need not hard-code them. It returns, per model: accuracy, macro precision/recall/F1, fatal-class recall, per-class precision/recall/F1/support and test-row count, plus a note that these are held-out CRSS test-split metrics (not live performance). Read-only: nothing is retrained or recalculated, no model file is opened, no path is returned. If a metrics file is missing or malformed, that model's entry is `available: false` with `evaluation: null` (never substituted). Covered by two tests in `tests/test_api_integration.py`.
 
-## 21. Test matrix
+## 21. Phase 6 additions
+
+`RESQAI_REQUIRE_MODELS`, `RESQAI_BOOTSTRAP_MODELS`, `RESQAI_MODEL_ARTIFACT_BASE_URL` (above); startup artifact bootstrap (`src/api/artifacts.py`); `VERSION` as the single version source; recommended production start command adds `--no-server-header`. No endpoint or response schema changed in Phase 6.
+
+## 22. Test matrix
 
 | Endpoint | Valid | Invalid | Edge / degraded |
 |---|:-:|:-:|:-:|
 | `GET /health` | ✓ | — | ✓ (models down → degraded; catalog down → unavailable) |
-| `GET /ready` | ✓ | — | ✓ (catalog down → 503 NOT_READY; models down → still READY) |
+| `GET /ready` | ✓ | — | ✓ (catalog down → 503 NOT_READY; models down → still READY, or NOT_READY when `RESQAI_REQUIRE_MODELS=true`) |
 | `GET /resources` | ✓ (+filters) | ✓ (malformed filter → 422) | ✓ (unknown type → empty; catalog down → 503) |
 | `GET /models` | ✓ | — | ✓ (models unavailable; no path leak) |
 | `POST /analyze` | ✓ (minor, serious, with/without coordinates, 5 E2E reports) | ✓ (missing/blank text, bad lat/lon, too long, bad timestamp, malformed JSON) | ✓ (prediction unavailable, model failure, internal failure → safe 500, service validation → 400, request-id handling, determinism, catalog loaded once, no text in logs) |
 | OpenAPI / CORS | ✓ (all 5 endpoints, tags, examples, allowed vs. disallowed origin) | | |
 
 Test kinds: `tests/test_api_unit.py` (22, **unit**), `tests/test_api_integration.py` (34, **integration**: real-service and fake-service groups), `tests/test_api_contract_and_e2e.py` (12, **contract + end-to-end** against real models).
-Full suite (`pytest -q`): **267 passed** (199 pre-Phase-4 + 68 API, including the 2 `/models/metrics` tests added in Phase 5).
+Full suite (`pytest -q`) at the v1.0.0 release: **289 passed** (199 pre-Phase-4 + 68 API tests + 22 added in Phase 6: 18 deployment/artifact/readiness/version tests and 4 extraction regression tests).

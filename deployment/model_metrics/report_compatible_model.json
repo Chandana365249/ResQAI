@@ -1,0 +1,166 @@
+{
+  "baseline_logistic_regression": {
+    "accuracy": 0.45188036718981345,
+    "macro_precision": 0.31313783755258917,
+    "macro_recall": 0.3303493300227619,
+    "macro_f1": 0.27598026379302054,
+    "per_class": {
+      "No Apparent Injury (O)": {
+        "precision": 0.5935524652338812,
+        "recall": 0.7594015365952285,
+        "f1": 0.6663118680149015,
+        "support": 4946.0
+      },
+      "Possible Injury (C)": {
+        "precision": 0.24124124124124124,
+        "recall": 0.11883629191321499,
+        "f1": 0.15923356458539809,
+        "support": 2028.0
+      },
+      "Suspected Minor Injury (B)": {
+        "precision": 0.47690014903129657,
+        "recall": 0.17391304347826086,
+        "f1": 0.2548785344484269,
+        "support": 1840.0
+      },
+      "Suspected Serious Injury (A)": {
+        "precision": 0.17016806722689076,
+        "recall": 0.14754098360655737,
+        "f1": 0.15804878048780488,
+        "support": 1098.0
+      },
+      "Fatal Injury (K)": {
+        "precision": 0.0838272650296359,
+        "recall": 0.4520547945205479,
+        "f1": 0.14142857142857143,
+        "support": 219.0
+      }
+    },
+    "confusion_matrix": [
+      [
+        3756,
+        468,
+        11,
+        417,
+        294
+      ],
+      [
+        1210,
+        241,
+        227,
+        153,
+        197
+      ],
+      [
+        849,
+        178,
+        320,
+        182,
+        311
+      ],
+      [
+        463,
+        92,
+        101,
+        162,
+        280
+      ],
+      [
+        50,
+        20,
+        12,
+        38,
+        99
+      ]
+    ],
+    "confusion_matrix_labels": [
+      "No Apparent Injury (O)",
+      "Possible Injury (C)",
+      "Suspected Minor Injury (B)",
+      "Suspected Serious Injury (A)",
+      "Fatal Injury (K)"
+    ]
+  },
+  "random_forest": {
+    "accuracy": 0.43549501529957557,
+    "macro_precision": 0.30839228556657206,
+    "macro_recall": 0.33885971975184337,
+    "macro_f1": 0.27750875420341997,
+    "per_class": {
+      "No Apparent Injury (O)": {
+        "precision": 0.6032235939643347,
+        "recall": 0.7112818439142742,
+        "f1": 0.6528112822416032,
+        "support": 4946.0
+      },
+      "Possible Injury (C)": {
+        "precision": 0.22979041916167664,
+        "recall": 0.15138067061143984,
+        "f1": 0.18252080856123662,
+        "support": 2028.0
+      },
+      "Suspected Minor Injury (B)": {
+        "precision": 0.4467153284671533,
+        "recall": 0.16630434782608697,
+        "f1": 0.24237623762376237,
+        "support": 1840.0
+      },
+      "Suspected Serious Injury (A)": {
+        "precision": 0.17789473684210527,
+        "recall": 0.15391621129326047,
+        "f1": 0.1650390625,
+        "support": 1098.0
+      },
+      "Fatal Injury (K)": {
+        "precision": 0.08433734939759036,
+        "recall": 0.5114155251141552,
+        "f1": 0.14479638009049775,
+        "support": 219.0
+      }
+    },
+    "confusion_matrix": [
+      [
+        3518,
+        654,
+        43,
+        414,
+        317
+      ],
+      [
+        1109,
+        307,
+        226,
+        138,
+        248
+      ],
+      [
+        771,
+        216,
+        306,
+        198,
+        349
+      ],
+      [
+        389,
+        138,
+        100,
+        169,
+        302
+      ],
+      [
+        45,
+        21,
+        10,
+        31,
+        112
+      ]
+    ],
+    "confusion_matrix_labels": [
+      "No Apparent Injury (O)",
+      "Possible Injury (C)",
+      "Suspected Minor Injury (B)",
+      "Suspected Serious Injury (A)",
+      "Fatal Injury (K)"
+    ]
+  }
+}

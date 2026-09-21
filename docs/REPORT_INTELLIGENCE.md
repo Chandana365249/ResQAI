@@ -348,3 +348,10 @@ of emails and phone numbers for use before logging or displaying
 report text; reusable modules (`report_parser.py`) never log full raw
 text at INFO level, only a redacted excerpt at DEBUG level. No legal
 compliance (GDPR, HIPAA, etc.) is claimed or implied by this utility.
+
+
+---
+
+## Addendum (Phase 6, 2026-09-21): vehicle count
+
+`vehicle_count` is now set **only from an explicit number** ("two cars", "one truck"). An indefinite article ("a truck", "an SUV") only records that a vehicle was *mentioned* (in `vehicle_types`); it no longer produces `vehicle_count = 1`, because "A car hit a parked vehicle" involves two vehicles and "a truck collision" does not say how many. See `docs/FATAL_SKEW_REVIEW.md`.

@@ -1,0 +1,48 @@
+{
+  "model_description": "Report-compatible severity model (MODEL B): trained on CRSS 2024 crash data restricted to features an emergency-report text extraction layer (ResQAI Phase 2) can legitimately supply. Predicts the same target as Phase 1's historical model (MAX_SEV) but is a SEPARATE model with a smaller, all-categorical feature set.",
+  "target_column": "MAX_SEV",
+  "target_labels": {
+    "0": "No Apparent Injury (O)",
+    "1": "Possible Injury (C)",
+    "2": "Suspected Minor Injury (B)",
+    "3": "Suspected Serious Injury (A)",
+    "4": "Fatal Injury (K)"
+  },
+  "target_class_counts": {
+    "0": 24732,
+    "1": 10139,
+    "2": 9198,
+    "3": 5489,
+    "4": 1096
+  },
+  "categorical_features": [
+    "time_of_day",
+    "is_weekend",
+    "intersection",
+    "highway",
+    "rain",
+    "fog",
+    "snow",
+    "strong_wind",
+    "multiple_vehicles",
+    "rollover",
+    "speeding",
+    "hit_and_run",
+    "pedestrian_involved",
+    "fire_present",
+    "hazardous_material"
+  ],
+  "numeric_features": [],
+  "n_rows": 50654,
+  "n_features": 15,
+  "random_seed": 42,
+  "test_size": 0.2,
+  "training_timestamp_utc": "2026-09-19T10:45:33+00:00",
+  "source_dataset": "NHTSA CRSS 2024",
+  "default_model_path": "models\\report_compatible_random_forest.joblib",
+  "known_limitations": [
+    "Trained on a smaller, coarser feature set than Phase 1's historical model; expected to have lower discriminative power (see docs/PHASE3_5_REPORT_READY_ML.md, 'Model comparison').",
+    "'highway' approximates CRSS INT_HWY (interstate specifically), which is broader than Phase 2's generic 'highway' language match.",
+    "fire_present and hazardous_material are rare positive classes (<0.5% of crashes) -- per-class metrics for these should be read with that base rate in mind."
+  ]
+}

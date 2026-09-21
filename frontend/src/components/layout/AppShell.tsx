@@ -96,7 +96,10 @@ export function AppShell() {
             ResQAI is a decision-support prototype. It does not dispatch emergency services, is not medical triage,
             and all resources shown are simulated.
           </p>
-          <HumanOversightNotice />
+          <span className="flex flex-wrap items-center gap-2">
+            <span>ResQAI v{__APP_VERSION__}</span>
+            <HumanOversightNotice />
+          </span>
         </div>
       </footer>
     </div>

@@ -1,0 +1,44 @@
+{
+  "release": "v1.0.0",
+  "base_url": "https://github.com/Chandana365249/ResQAI/releases/download/v1.0.0",
+  "downloads": [
+    {
+      "name": "random_forest.joblib",
+      "dest": "models/random_forest.joblib",
+      "sha256": "12e4278144be17d1db9d662fef38e7650a3c4a69f20a14eba7ca24b88ebf8bd1",
+      "size_bytes": 84596634
+    },
+    {
+      "name": "report_compatible_random_forest.joblib",
+      "dest": "models/report_compatible_random_forest.joblib",
+      "sha256": "645027672ad0b8c52acadf92cd9fc8f66dbf16900beddcc224cdef234e444410",
+      "size_bytes": 14816714
+    }
+  ],
+  "bundled": [
+    {
+      "source": "deployment/model_metadata/feature_metadata.json",
+      "dest": "artifacts/feature_metadata.json",
+      "sha256": "4c692fcb287c2efff1e1e2629e399a8164868e96b7ebf7f6f4850a9929001b1c",
+      "size_bytes": 1144
+    },
+    {
+      "source": "deployment/model_metadata/report_compatible_feature_metadata.json",
+      "dest": "artifacts/report_compatible_feature_metadata.json",
+      "sha256": "480d5de1d08f7b9190bd3f953d2667bf5f3c38f237f93d1d45ad31fdafa596ee",
+      "size_bytes": 1828
+    },
+    {
+      "source": "deployment/model_metrics/historical_model.json",
+      "dest": "artifacts/metrics.json",
+      "sha256": "74d44a4fdf875066183e9c290829e704044ebfee6ce8dcc8556d058fabd2e849",
+      "size_bytes": 3699
+    },
+    {
+      "source": "deployment/model_metrics/report_compatible_model.json",
+      "dest": "artifacts/report_compatible_metrics.json",
+      "sha256": "eee9836dcd8dd8d725442acf4a3c81d96285fea81215cef86c97a92df1b11963",
+      "size_bytes": 3697
+    }
+  ]
+}

@@ -16,6 +16,8 @@ export function SystemStatusPill() {
   let view: PillView;
   if (state.status === "loading") {
     view = { label: "Checking service…", Icon: Loader2, className: "bg-slate-100 text-slate-700 ring-slate-300", spin: true };
+  } else if (state.status === "waking") {
+    view = { label: "Waking up service… (idle hosting can take a minute)", Icon: Loader2, className: "bg-amber-50 text-amber-900 ring-amber-300", spin: true };
   } else if (state.status === "unreachable") {
     view = { label: "Service unreachable", Icon: CircleSlash, className: "bg-red-50 text-red-900 ring-red-300" };
   } else if (state.readiness.status === "NOT_READY" || state.health.status === "unavailable") {

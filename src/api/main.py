@@ -24,6 +24,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from .artifacts import ensure_model_artifacts
 from .config import API_PREFIX, API_VERSION, SERVICE_NAME, Settings, load_settings
 from .errors import UNKNOWN_REQUEST_ID, internal_error_response, register_exception_handlers
 from .logging_utils import configure_api_logging, log_event
@@ -86,11 +87,24 @@ def create_app(
 ) -> FastAPI:
     settings = settings or load_settings()
     configure_api_logging(settings.log_level)
-    service = app_service or ResQAIApplicationService(environment=settings.environment)
+    service = app_service or ResQAIApplicationService(
+        environment=settings.environment, require_models=settings.require_models
+    )
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        # Startup: load the demo catalog and warm both models ONCE; requests reuse them.
+        # Startup: (optionally) verify/download the pinned model artifacts, then load the
+        # demo catalog and warm both models ONCE; requests reuse them.
+        if settings.bootstrap_models:
+            try:
+                report = ensure_model_artifacts(base_url_override=settings.model_artifact_base_url)
+                log_event(
+                    logger, logging.INFO if report.ok else logging.ERROR, "model_artifacts",
+                    release=report.release, ok=report.ok,
+                    outcomes=", ".join(f"{o.name}={o.status}" for o in report.outcomes),
+                )
+            except Exception as exc:  # noqa: BLE001 -- a bootstrap failure degrades the service; it must not crash it
+                logger.error("Model artifact bootstrap could not run: %s", exc)
         service.start()
         yield
 

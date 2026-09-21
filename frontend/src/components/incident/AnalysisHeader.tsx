@@ -62,19 +62,19 @@ export function AnalysisHeader({ result }: { result: AnalyzeResponse }) {
           {incident.incident_subtype && <p className="text-sm text-slate-700">{incident.incident_subtype}</p>}
         </Tile>
 
-        <Tile label="Priority" origin="rules">
-          <div className="flex items-center gap-2">
-            <PriorityBadge priority={decision.priority} large />
-            <span className="text-xs text-slate-600">P0 highest → P3 lowest</span>
-          </div>
-        </Tile>
-
         <Tile label="Operational risk" origin="rules">
           <div className="flex items-center gap-2">
             <LevelBadge level={decision.risk_level} />
             <span className="text-xs text-slate-600">
               {result.risk_indicators.length} indicator{result.risk_indicators.length === 1 ? "" : "s"}
             </span>
+          </div>
+        </Tile>
+
+        <Tile label="Priority" origin="rules">
+          <div className="flex items-center gap-2">
+            <PriorityBadge priority={decision.priority} large />
+            <span className="text-xs text-slate-600">P0 highest → P3 lowest</span>
           </div>
         </Tile>
 

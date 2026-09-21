@@ -110,11 +110,13 @@ class ResQAIApplicationService:
     def __init__(
         self,
         environment: str = "local",
+        require_models: bool = False,
         analyze_fn: Callable[..., UnifiedResQAIResult] = analyze_emergency_report,
         catalog_loader: Callable[[], List[Resource]] = load_resource_catalog,
         predictors_provider: Callable[[], Dict[str, SeverityPredictor]] = get_default_predictors,
     ) -> None:
         self._environment = environment
+        self._require_models = require_models
         self._analyze_fn = analyze_fn
         self._catalog_loader = catalog_loader
         self._predictors_provider = predictors_provider
@@ -240,13 +242,18 @@ class ResQAIApplicationService:
                 components[key] = ComponentHealth(status="unavailable", detail="Model artifact is not loaded.")
         return components
 
-    @staticmethod
-    def _critical_failures(components: Dict[str, ComponentHealth]) -> List[str]:
-        return [name for name in _CRITICAL_COMPONENTS if components[name].status == "unavailable"]
+    def _critical_failures(self, components: Dict[str, ComponentHealth]) -> List[str]:
+        """Components whose absence makes the service NOT_READY. Models count only when
+        RESQAI_REQUIRE_MODELS is on (deployment): analysis still works without a model,
+        but a public demo without its models must not claim to be ready."""
+        required = list(_CRITICAL_COMPONENTS)
+        if self._require_models:
+            required += list(_MODEL_COMPONENTS.values())
+        return [name for name in required if components[name].status == "unavailable"]
 
     def health(self) -> HealthResponse:
         components = self._components()
-        if self._critical_failures(components):
+        if any(components[name].status == "unavailable" for name in _CRITICAL_COMPONENTS):
             overall = "unavailable"
         elif any(components[k].status == "unavailable" for k in _MODEL_COMPONENTS.values()):
             overall = "degraded"

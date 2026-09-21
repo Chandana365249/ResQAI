@@ -5,16 +5,31 @@
 
 import type { ErrorDetail, ErrorResponse } from "./types";
 
-const DEFAULT_API_BASE_URL = "http://127.0.0.1:8000";
+// Guarded by Vite's compile-time DEV flag so the bundler removes this literal from
+// production builds entirely: a deployed bundle must not even contain a localhost URL.
+const DEV_FALLBACK_API_BASE_URL: string | undefined = import.meta.env.DEV ? "http://127.0.0.1:8000" : undefined;
 export const API_PREFIX = "/api/v1";
 export const DEFAULT_TIMEOUT_MS = 30_000;
 
-export function getApiBaseUrl(): string {
-  const configured = import.meta.env.VITE_API_BASE_URL;
-  return (configured && configured.trim() ? configured : DEFAULT_API_BASE_URL).replace(/\/+$/, "");
+/**
+ * The backend base URL, or null when a PRODUCTION build was made without
+ * VITE_API_BASE_URL. Only local development falls back to localhost; a deployed
+ * build must never silently call a developer machine.
+ */
+export function resolveApiBaseUrl(
+  env: { VITE_API_BASE_URL?: string; PROD: boolean },
+  devFallback: string | undefined,
+): string | null {
+  const configured = env.VITE_API_BASE_URL?.trim();
+  if (configured) return configured.replace(/\/+$/, "");
+  return env.PROD ? null : (devFallback ?? null);
 }
 
-export type ApiErrorKind = "http" | "network" | "timeout" | "invalid_response";
+export function getApiBaseUrl(): string | null {
+  return resolveApiBaseUrl(import.meta.env, DEV_FALLBACK_API_BASE_URL);
+}
+
+export type ApiErrorKind = "http" | "network" | "timeout" | "invalid_response" | "not_configured";
 
 export class ApiError extends Error {
   readonly kind: ApiErrorKind;
@@ -49,7 +64,11 @@ export interface RequestOptions {
 }
 
 function buildUrl(path: string, query?: RequestOptions["query"]): string {
-  const url = new URL(`${getApiBaseUrl()}${API_PREFIX}${path}`);
+  const base = getApiBaseUrl();
+  if (base === null) {
+    throw new ApiError("not_configured", "This build of the dashboard has no backend URL configured (VITE_API_BASE_URL).");
+  }
+  const url = new URL(`${base}${API_PREFIX}${path}`);
   for (const [key, value] of Object.entries(query ?? {})) {
     if (value) url.searchParams.set(key, value);
   }
@@ -68,6 +87,10 @@ function isErrorResponse(body: unknown): body is ErrorResponse {
 export async function requestJson<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = "GET", body, query, timeoutMs = DEFAULT_TIMEOUT_MS, signal, acceptStatuses = [] } = options;
 
+  // Resolved BEFORE the try/catch below, so a missing configuration is reported as such
+  // instead of being mistaken for a network failure.
+  const url = buildUrl(path, query);
+
   const controller = new AbortController();
   let timedOut = false;
   const timer = setTimeout(() => {
@@ -79,7 +102,7 @@ export async function requestJson<T>(path: string, options: RequestOptions = {})
 
   let response: Response;
   try {
-    response = await fetch(buildUrl(path, query), {
+    response = await fetch(url, {
       method,
       headers:
         body !== undefined

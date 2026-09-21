@@ -24,7 +24,7 @@ export function renderWithProviders(ui: ReactElement, options: RenderOptions = {
   } = options;
   return render(
     <MemoryRouter initialEntries={[route]}>
-      <SystemStatusProvider fetchHealth={fetchHealth} fetchReadiness={fetchReadiness}>
+      <SystemStatusProvider fetchHealth={fetchHealth} fetchReadiness={fetchReadiness} wakeDelayMs={0}>
         <AnalysisProvider analyze={analyze}>{ui}</AnalysisProvider>
       </SystemStatusProvider>
     </MemoryRouter>,

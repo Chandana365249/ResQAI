@@ -77,6 +77,12 @@ export function describeError(error: unknown): UserFacingError {
           message: "The analysis took too long to respond. Please try again.",
           fieldErrors: {}, retryable: true, requestId: null,
         };
+      case "not_configured":
+        return {
+          title: "Dashboard is not connected to a backend",
+          message: "This deployment of the dashboard has no backend URL configured, so it cannot analyze reports. Please contact the operator.",
+          fieldErrors: {}, retryable: false, requestId: null,
+        };
       case "invalid_response":
         return {
           title: "Unexpected response",

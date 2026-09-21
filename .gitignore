@@ -37,3 +37,6 @@ Thumbs.db
 node_modules/
 frontend/dist/
 *.tsbuildinfo
+
+# --- Release assets staged for upload (large binaries; published as GitHub Release assets) ---
+release-assets/

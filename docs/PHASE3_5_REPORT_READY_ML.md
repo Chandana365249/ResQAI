@@ -337,3 +337,15 @@ evaluation. Both models' metrics (including the weaker one) are
 reported and compared honestly, with fatal-class recall tracked
 alongside macro F1 given the domain's asymmetric cost of missing a
 severe outcome.
+
+
+---
+
+## Addendum (Phase 6, 2026-09-21): vehicle-count correction
+
+A Phase 6 review of the report-compatible model's Fatal-class skew (`docs/FATAL_SKEW_REVIEW.md`) found a defect in the Phase 2 extractor that this document's feature mappings depend on: an **indefinite article was treated as a vehicle count** (`"a truck"` → `vehicle_count = 1`, which produced `multiple_vehicles = "No"` for both models). It is fixed: only an explicit number ("two cars", "one truck") now establishes a count; an article leaves the count missing. Consequences for the statements above:
+
+- `multiple_vehicles` (Model B) and `VE_TOTAL` / `veh_count` (Model A) are now mapped **only** from an explicit count.
+- Reports such as *"A chemical spill was reported after a truck collision."* now supply one feature (`hazardous_material`) and therefore fall below Model B's 2-feature minimum: **no prediction** is made for them.
+- The pipeline coverage benchmark was re-run after the fix: **unchanged** (Model A 0.0 %, Model B ready/partial 90.0 %, overall 90.0 %).
+- Neither model was retrained; the extraction change does not affect the trained artifacts.

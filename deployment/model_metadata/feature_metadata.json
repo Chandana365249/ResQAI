@@ -1,0 +1,55 @@
+{
+  "target_column": "MAX_SEV",
+  "target_labels": {
+    "0": "No Apparent Injury (O)",
+    "1": "Possible Injury (C)",
+    "2": "Suspected Minor Injury (B)",
+    "3": "Suspected Serious Injury (A)",
+    "4": "Fatal Injury (K)"
+  },
+  "target_class_counts": {
+    "0": 24732,
+    "1": 10139,
+    "2": 9198,
+    "3": 5489,
+    "4": 1096
+  },
+  "categorical_features": [
+    "MONTHNAME",
+    "DAY_WEEKNAME",
+    "HOUR_IMNAME",
+    "LGTCON_IMNAME",
+    "WEATHR_IMNAME",
+    "URBANICITYNAME",
+    "REL_ROADNAME",
+    "TYP_INTNAME",
+    "RELJCT1_IMNAME",
+    "RELJCT2_IMNAME",
+    "MANCOL_IMNAME",
+    "EVENT1_IMNAME",
+    "WRK_ZONENAME",
+    "SCH_BUSNAME",
+    "INT_HWYNAME",
+    "ALCHL_IMNAME",
+    "time_of_day",
+    "is_weekend"
+  ],
+  "numeric_features": [
+    "VE_TOTAL",
+    "PVH_INVL",
+    "PEDS",
+    "PERNOTMVIT",
+    "PERMVIT",
+    "veh_count",
+    "any_speeding_involved",
+    "any_hit_run_involved",
+    "any_rollover_involved",
+    "avg_vehicle_age_years",
+    "person_count",
+    "min_age",
+    "driver_count",
+    "any_minor_involved"
+  ],
+  "n_rows": 50654,
+  "n_features": 32
+}

@@ -12,10 +12,14 @@ export function AnalyzePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Analyze an emergency report</h1>
+        <p className="text-xs font-semibold uppercase tracking-wide text-teal-800">
+          AI-assisted emergency response · decision support
+        </p>
+        <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-slate-900">Analyze an emergency report</h1>
         <p className="mt-1 max-w-3xl text-sm text-slate-700">
-          Enter a free-text report. ResQAI extracts what it says, flags operational risks, estimates severity with a
-          statistical model when the report supports it, and matches simulated demo resources. A person makes every decision.
+          ResQAI analyzes the report and provides decision-support information for human review. It extracts what the
+          report says, flags operational risks, estimates severity with a statistical model when the report supports it,
+          and matches simulated demo resources. It does not dispatch anyone or make decisions.
         </p>
       </div>
 

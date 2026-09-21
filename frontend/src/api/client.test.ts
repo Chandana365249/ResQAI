@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { ApiError, analyzeReport, getModelMetrics, getReadiness, getResources } from "./index";
+import { resolveApiBaseUrl } from "./http";
+import { describeError } from "../lib/errors";
 import { jsonResponse, stubFetch } from "../test/utils";
 import { metricsFixture, serious, validationErrorFixture } from "../test/fixtures";
 
@@ -83,5 +85,45 @@ describe("API client", () => {
     stubFetch({ "/models/metrics": () => jsonResponse(metricsFixture) });
     const result = await getModelMetrics();
     expect(result.models).toHaveLength(2);
+  });
+});
+
+describe("production configuration", () => {
+  it("never falls back to localhost in a production build without an API URL", () => {
+    expect(resolveApiBaseUrl({ PROD: true, VITE_API_BASE_URL: undefined }, "http://127.0.0.1:8000")).toBeNull();
+    expect(resolveApiBaseUrl({ PROD: true, VITE_API_BASE_URL: "   " }, "http://127.0.0.1:8000")).toBeNull();
+  });
+
+  it("falls back to the local backend only during development", () => {
+    expect(resolveApiBaseUrl({ PROD: false, VITE_API_BASE_URL: undefined }, "http://127.0.0.1:8000")).toBe("http://127.0.0.1:8000");
+  });
+
+  it("uses the configured URL with any trailing slash removed", () => {
+    expect(resolveApiBaseUrl({ PROD: true, VITE_API_BASE_URL: "https://api.example.test/" }, undefined)).toBe("https://api.example.test");
+    expect(resolveApiBaseUrl({ PROD: false, VITE_API_BASE_URL: "https://api.example.test//" }, undefined)).toBe("https://api.example.test");
+  });
+
+  it("a production build with no API URL reports not_configured (not a network error) and sends nothing", async () => {
+    // Regression: buildUrl used to run inside requestJson's try/catch, so this was mislabelled "network".
+    vi.stubEnv("DEV", false);
+    vi.stubEnv("PROD", true);
+    vi.stubEnv("VITE_API_BASE_URL", "");
+    vi.resetModules();
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const { analyzeReport: freshAnalyze } = await import("./analyze");
+    const { ApiError: FreshApiError } = await import("./http");
+    const error = await freshAnalyze({ raw_text: "x" }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(FreshApiError);
+    expect((error as ApiError).kind).toBe("not_configured");
+    expect(fetchSpy).not.toHaveBeenCalled();
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it("maps the not_configured error to an operator-facing message", () => {
+    const result = describeError(new ApiError("not_configured", "x"));
+    expect(result.title).toBe("Dashboard is not connected to a backend");
+    expect(result.retryable).toBe(false);
   });
 });

@@ -270,3 +270,46 @@ def test_end_to_end_realistic_report_status_documented():
         "PVH_INVL", "PERNOTMVIT", "PERMVIT", "person_count", "min_age", "driver_count",
     }
     assert unmapped_numeric_unsupported <= set(result.readiness.unsupported_features)
+
+
+# --- Phase 6 regression: an indefinite article is not a vehicle count ---------
+# Found by the Fatal-skew review (scripts/fatal_skew_review.py): "a truck
+# collision" produced vehicle_count=1 (confirmed) and therefore the unsupported
+# claim multiple_vehicles="No"; "A car hit a parked vehicle" (two vehicles)
+# produced vehicle_count=1 as well.
+
+
+def _mapped_b(text):
+    from src.report_model_adapter import adapt_incident_to_report_compatible_features
+    from src.report_parser import parse_report as _parse
+
+    report, _ = _parse("p6", text)
+    result = adapt_incident_to_report_compatible_features(report)
+    return report, {m.feature_name: m.value for m in result.mappings if m.mapped}
+
+
+def test_indefinite_article_does_not_establish_a_vehicle_count():
+    report, mapped = _mapped_b("A chemical spill was reported after a truck collision.")
+    assert report.vehicles.vehicle_count.is_present is False
+    assert "multiple_vehicles" not in mapped  # missing, NOT the unsupported "No"
+    assert report.vehicles.vehicle_types.value == ["truck"]  # the mention itself is still recorded
+
+
+def test_a_car_hitting_a_parked_vehicle_is_not_counted_as_one_vehicle():
+    report, mapped = _mapped_b("A car hit a parked vehicle in a parking lot.")
+    assert report.vehicles.vehicle_count.is_present is False
+    assert "multiple_vehicles" not in mapped
+
+
+def test_explicit_numbers_still_establish_a_count():
+    report, mapped = _mapped_b("Two cars collided at an intersection.")
+    assert report.vehicles.vehicle_count.value == 2
+    assert mapped["multiple_vehicles"] == "Yes"
+    report, mapped = _mapped_b("One car crashed into a wall.")
+    assert report.vehicles.vehicle_count.value == 1
+    assert mapped["multiple_vehicles"] == "No"  # an explicit "one" is a stated count
+
+
+def test_a_later_explicit_number_in_the_same_clause_is_still_found():
+    report, _ = _mapped_b("A truck and three cars were involved.")
+    assert report.vehicles.vehicle_count.value == 3

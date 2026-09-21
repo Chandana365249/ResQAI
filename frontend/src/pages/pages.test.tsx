@@ -264,6 +264,14 @@ describe("Analytics page", () => {
     }
     expect(within(table).getByText("Fatal-class recall")).toBeInTheDocument();
     expect(screen.getByText("Reading the trade-offs")).toBeInTheDocument();
+    // model role, feature count, prediction-source id and limitations come from GET /models
+    const facts = await screen.findByRole("group", { name: "About these models" });
+    for (const m of modelsFixture.models) {
+      expect(within(facts).getByText(m.source_id)).toBeInTheDocument();
+      expect(within(facts).getByText(m.limitations[0]!)).toBeInTheDocument();
+    }
+    expect(within(facts).getByText("32")).toBeInTheDocument();
+    expect(within(facts).getByText("15")).toBeInTheDocument();
     expect(screen.queryByText(/\bbest\b/i)).not.toBeInTheDocument();
   });
 
@@ -326,6 +334,47 @@ describe("System page", () => {
   });
 });
 
+describe("Backend waking up (free hosting cold start)", () => {
+  it("retries patiently, shows a waking state, then recovers without any user action", async () => {
+    stubFetch(apiRoutes());
+    const fetchHealth = vi.fn()
+      .mockRejectedValueOnce(new ApiError("network", "x"))
+      .mockRejectedValueOnce(new ApiError("timeout", "x"))
+      .mockResolvedValue(healthFixture);
+    renderWithProviders(<App />, { route: "/analyze", fetchHealth });
+    expect(await screen.findByText("Service ready")).toBeInTheDocument();
+    expect(fetchHealth).toHaveBeenCalledTimes(3);
+  });
+
+  it("shows the waking state while retrying", async () => {
+    stubFetch(apiRoutes());
+    let release!: (h: typeof healthFixture) => void;
+    const fetchHealth = vi.fn()
+      .mockRejectedValueOnce(new ApiError("network", "x"))
+      .mockImplementationOnce(() => new Promise((res) => { release = res; }));
+    renderWithProviders(<App />, { route: "/analyze", fetchHealth });
+    expect(await screen.findByText(/Waking up service/)).toBeInTheDocument();
+    release(healthFixture);
+    expect(await screen.findByText("Service ready")).toBeInTheDocument();
+  });
+
+  it("gives up after the retry budget and reports the service as unreachable", async () => {
+    stubFetch(apiRoutes());
+    const fetchHealth = vi.fn().mockRejectedValue(new ApiError("network", "x"));
+    renderWithProviders(<App />, { route: "/analyze", fetchHealth });
+    expect((await screen.findAllByText("Service unreachable")).length).toBeGreaterThan(0);
+    expect(fetchHealth.mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it("does not retry a configuration error (it will not fix itself)", async () => {
+    stubFetch(apiRoutes());
+    const fetchHealth = vi.fn().mockRejectedValue(new ApiError("not_configured", "x"));
+    renderWithProviders(<App />, { route: "/analyze", fetchHealth });
+    expect((await screen.findAllByText("Service unreachable")).length).toBeGreaterThan(0);
+    expect(fetchHealth).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("Navigation and layout", () => {
   it("offers all four areas plus a persistent human-oversight notice and status pill", async () => {
     stubFetch(apiRoutes());
@@ -336,6 +385,19 @@ describe("Navigation and layout", () => {
     }
     expect(screen.getByText("Human oversight required")).toBeInTheDocument();
     expect(await screen.findByText("Service ready")).toBeInTheDocument();
+  });
+
+  it("shows the single release version from the VERSION file in the footer", () => {
+    stubFetch(apiRoutes());
+    renderWithProviders(<App />, { route: "/analyze" });
+    expect(screen.getByText(`ResQAI v${__APP_VERSION__}`)).toBeInTheDocument();
+    expect(__APP_VERSION__).toMatch(/^[0-9]+[.][0-9]+[.][0-9]+/);
+  });
+
+  it("states the decision-support purpose and human review on the analyze page", () => {
+    stubFetch(apiRoutes());
+    renderWithProviders(<App />, { route: "/analyze" });
+    expect(screen.getByText(/provides decision-support information for human review/)).toBeInTheDocument();
   });
 
   it("redirects / to the analyze workflow", () => {

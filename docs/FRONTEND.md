@@ -53,7 +53,7 @@ Types in `api/types.ts` mirror `src/api/schemas/*.py` field-for-field (checked a
 VITE_API_BASE_URL=http://127.0.0.1:8000
 ```
 
-Copy to `frontend/.env` to override (`.env` is git-ignored; `.env.example` is committed). If unset, the client falls back to `http://127.0.0.1:8000` in one place (`api/http.ts`).
+Copy to `frontend/.env` to override (`.env` is git-ignored; `.env.example` is committed). If unset, **local development** falls back to `http://127.0.0.1:8000` (in one place, `api/http.ts`); a **production build without it refuses to call anything** — that literal is compiled out of production bundles (verified) and the UI says the dashboard has no backend configured.
 
 **CORS:** the backend's default allow-list already contains `http://localhost:5173` and `http://127.0.0.1:5173`, and the Vite dev server is pinned to port 5173 (`strictPort`), so no backend change is needed locally. For another origin, start the backend with `RESQAI_ALLOWED_ORIGINS=https://your-frontend.example` (comma-separated). Note `localhost` and `127.0.0.1` are different origins; both are allowed by default.
 
@@ -78,7 +78,7 @@ Form → client validation (blank text, length, coordinate ranges, coordinates a
 
 ## 7. Result UI (in visual-hierarchy order)
 
-1. **Header** — four *separate* tiles: Incident (from the report), Priority (project rules), Operational risk (project rules), Model prediction (statistical model). There is no combined "AI score". Human-oversight badge, request id, processing time, *Download JSON*.
+1. **Header** — four *separate* tiles, in this order: Incident (from the report), Operational risk (project rules), Priority (project rules), Model prediction (statistical model). There is no combined "AI score". Human-oversight badge, request id, processing time, *Download JSON*.
 2. **Model/rule disagreement** (only when flagged) — calm amber panel showing both sides, the backend's own explanation, and "Human review required". It never chooses a side.
 3. **Risk indicators** and **Priority & recommended response** (side by side).
 4. **Machine-learning prediction** — label, source, model, features used, real probabilities, the backend's routing note verbatim, and an expandable model-input readiness view. If unavailable: "Model prediction unavailable" with the backend's reason.
@@ -104,7 +104,7 @@ Every chart has a title, unit, empty state, an accessible label, and a text-tabl
 
 ## 10. System page
 
-Health (healthy / degraded / unavailable), readiness (with reasons if `NOT_READY`), per-component status (API, parser, risk engine, decision engine, resource catalog, both models), backend version/environment, the API base URL in use, and model cards with the backend's descriptions, limitations and routing explanation. The header pill mirrors the same status.
+Health (healthy / degraded / unavailable), readiness (with reasons if `NOT_READY`), per-component status (API, parser, risk engine, decision engine, resource catalog, both models), backend version/environment, the API base URL in use, and model cards with the backend's descriptions, limitations and routing explanation. The header pill mirrors the same status. On first load, if the backend does not answer (network/timeout) the dashboard retries patiently (6 retries, 10 s apart) and shows "Waking up service…" — free hosting sleeps when idle and takes about a minute to wake; a configuration error is not retried. The manual *Refresh* makes a single attempt.
 
 ## 11. Error handling
 
@@ -124,14 +124,14 @@ Semantic landmarks and heading order; a skip link; every input labelled; errors 
 
 ## 15. Tests
 
-`cd frontend && npm test` — **90 tests**, 5 files:
+`cd frontend && npm test` — **102 tests** (96 without a backend + 6 live), 5 files:
 
 | File | Tests | Kind |
 |---|---:|---|
-| `api/client.test.ts` | 9 | API client: success, 422, 503, network, timeout, non-JSON error, `/ready` 503, filters, metrics |
+| `api/client.test.ts` | 14 | API client: success, 422, 503, network, timeout, non-JSON error, `/ready` 503, filters, metrics |
 | `lib/lib.test.ts` | 14 | formatting, error translation, form validation, session history, analytics (counts, disagreement, empty), projection |
-| `components/components.test.tsx` | 31 | rendering of extracted fields, certainty, evidence, risks, ML, source, probabilities (present/missing), disagreement, decision, resources, simulated labelling, missing location, empty states, plus two regression tests from browser verification |
-| `pages/pages.test.tsx` | 30 | Analyze flow (loading/success/error/retry/duplicate/422/network), Resources, Analytics (empty/session/clear/metrics), System, navigation and mobile menu |
+| `components/components.test.tsx` | 32 | rendering of extracted fields, certainty, evidence, risks, ML, source, probabilities (present/missing), disagreement, decision, resources, simulated labelling, missing location, empty states, plus two regression tests from browser verification |
+| `pages/pages.test.tsx` | 36 | Analyze flow (loading/success/error/retry/duplicate/422/network), Resources, Analytics (empty/session/clear/metrics), System, navigation and mobile menu |
 | `test/live.integration.test.tsx` | 6 | **live**: real client + real UI against a running FastAPI backend |
 
 Component/page tests use **fixtures that are real API responses** captured from the running backend (`src/test/fixtures/*.json`); nothing is hand-written. To refresh them, re-capture with `curl` from the running API. The live tests skip (not fail) if no backend is reachable; set `RESQAI_LIVE_TESTS=1` to make an unreachable backend a hard failure.
@@ -146,4 +146,4 @@ Real-browser verification (Chrome via Playwright, not committed): 51 checks acro
 - The 5000-character limit and priority scale wording are mirrored in the UI for feedback only; the backend is authoritative.
 - Priority `P0 highest → P3 lowest` is the project's own scale (from the backend enum), not a standard.
 - Fonts use the system stack (no external font requests).
-- No authentication, deployment, dark theme, or i18n.
+- No authentication, dark theme, or i18n. (Deployment: see `docs/DEPLOYMENT.md`; the app has not been deployed yet.)

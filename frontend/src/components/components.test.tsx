@@ -292,3 +292,15 @@ describe("regressions found during real-browser verification", () => {
     expect(screen.getByText(/Location not provided/)).toBeInTheDocument();
   });
 });
+
+describe("result hierarchy (Phase 6)", () => {
+  it("orders the header tiles: Incident, Operational risk, Priority, Model prediction", () => {
+    render(<AnalysisHeader result={serious} />);
+    const labels = ["Incident", "Operational risk", "Priority", "Model prediction"].map(
+      (l) => screen.getByText(l, { selector: "p" }),
+    );
+    for (let i = 1; i < labels.length; i++) {
+      expect(labels[i - 1]!.compareDocumentPosition(labels[i]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+  });
+});

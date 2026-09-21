@@ -55,6 +55,9 @@ export function SystemStatusCard() {
       }
     >
       {state.status === "loading" && <Spinner label="Checking the ResQAI service…" />}
+      {state.status === "waking" && (
+        <Spinner label={`The service has not answered yet (attempt ${state.attempt}); it may be waking up after being idle, which can take about a minute. Retrying…`} />
+      )}
       {state.status === "unreachable" && <ErrorPanel error={state.error} onRetry={() => void refresh()} />}
       {state.status === "loaded" && (
         <div className="space-y-4">
@@ -87,7 +90,8 @@ export function SystemStatusCard() {
         </div>
       )}
       <p className="mt-3 text-xs text-slate-600">
-        Dashboard is connected to <span className="font-mono">{getApiBaseUrl()}</span>
+        Dashboard is connected to{" "}
+        {getApiBaseUrl() ? <span className="font-mono">{getApiBaseUrl()}</span> : <strong>(no backend URL configured)</strong>}
       </p>
     </Card>
   );
