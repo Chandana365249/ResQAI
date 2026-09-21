@@ -18,16 +18,32 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import List, Optional
+from pathlib import Path
+from typing import Dict, List, Optional
 
 from .decision_engine import make_decision
 from .extraction.base import BaseReportExtractor
 from .location_engine import LocationAssessment, assess_incident_location
 from .ml_adapter import AdapterResult, FeatureMapping, PredictionReadiness, ReadinessStatus, adapt_incident_to_ml_features
+from .report_model_adapter import adapt_incident_to_report_compatible_features
 from .report_parser import parse_report
-from .resource_engine import ResourceSearchResult, find_resources_for_categories
+from .resource_engine import Resource, ResourceSearchResult, find_resources_for_categories
 from .schemas import DecisionResult, IncidentReport, RiskIndicator
 from .severity_predictor import SeverityPredictor, SeverityPrediction
+
+REPORT_COMPATIBLE_MODEL_PATH = Path("models/report_compatible_random_forest.joblib")
+REPORT_COMPATIBLE_METADATA_PATH = Path("artifacts/report_compatible_feature_metadata.json")
+
+# Step 14 routing explanations -- shown verbatim in UnifiedResQAIResult.prediction_note.
+_NOTE_USED_REPORT_COMPATIBLE_MODEL = (
+    "Original Phase 1 model required unavailable numeric features; a separately "
+    "trained report-compatible model was used with only features supported by "
+    "the emergency-report extraction layer."
+)
+_NOTE_NO_MODEL_AVAILABLE = (
+    "Neither the original Phase 1 model nor the report-compatible model had "
+    "enough report-observable information to produce a severity prediction."
+)
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +82,7 @@ class AuditRecord:
     unsupported_ml_features: List[str]
     ml_prediction_available: bool
     ml_predicted_class: Optional[int]
+    ml_prediction_source: str
     risk_indicator_names: List[str]
     priority: str
     selected_resource_ids: List[str]
@@ -79,6 +96,10 @@ class UnifiedResQAIResult:
     risk_indicators: List[RiskIndicator]
     priority_decision: DecisionResult
     ml_prediction: SeverityPrediction
+    # Model A (Phase 1 historical model) mapping/readiness -- always
+    # computed, since routing always tries Model A first (see
+    # _route_ml_prediction). Kept under these original field names for
+    # backward compatibility with Phase 3 code/tests.
     ml_feature_mappings: List[FeatureMapping]
     prediction_readiness: PredictionReadiness
     location_assessment: LocationAssessment
@@ -87,6 +108,13 @@ class UnifiedResQAIResult:
     audit: AuditRecord
     warnings: List[str] = field(default_factory=list)
     disagreement_warning: Optional[str] = None
+    # Model B (report-compatible model) mapping/readiness -- only computed
+    # (non-None) when Model A's readiness was UNAVAILABLE and routing fell
+    # through to Model B. See ml_prediction.prediction_source for which
+    # model's output (if either) is in `ml_prediction` above.
+    report_compatible_feature_mappings: Optional[List[FeatureMapping]] = None
+    report_compatible_readiness: Optional[PredictionReadiness] = None
+    prediction_note: Optional[str] = None
     human_oversight_required: bool = True  # always True -- ResQAI is a decision-support prototype, never autonomous
 
 
@@ -94,13 +122,71 @@ _default_predictor: Optional[SeverityPredictor] = None
 
 
 def _get_default_predictor() -> SeverityPredictor:
-    """A single, lazily-created, reused SeverityPredictor (Phase 3R: avoid
-    re-loading the ~84MB model artifact on every call).
+    """A single, lazily-created, reused SeverityPredictor for MODEL A, the
+    original Phase 1 historical model (Phase 3R: avoid re-loading the
+    ~84MB model artifact on every call).
     """
     global _default_predictor
     if _default_predictor is None:
-        _default_predictor = SeverityPredictor()
+        _default_predictor = SeverityPredictor(source_label="phase1_historical_model")
     return _default_predictor
+
+
+_default_report_compatible_predictor: Optional[SeverityPredictor] = None
+
+
+def _get_default_report_compatible_predictor() -> SeverityPredictor:
+    """Lazily-created, reused SeverityPredictor for MODEL B (Phase 3.5's
+    report-compatible model -- see train_report_compatible_model.py).
+    Reuses the SAME SeverityPredictor class as Model A; only the artifact
+    path, feature metadata path, and source_label differ.
+    """
+    global _default_report_compatible_predictor
+    if _default_report_compatible_predictor is None:
+        _default_report_compatible_predictor = SeverityPredictor(
+            model_path=REPORT_COMPATIBLE_MODEL_PATH,
+            feature_metadata_path=REPORT_COMPATIBLE_METADATA_PATH,
+            source_label="report_compatible_model",
+        )
+    return _default_report_compatible_predictor
+
+
+def get_default_predictors() -> Dict[str, SeverityPredictor]:
+    """Public accessor for the two process-wide predictors, keyed by their
+    `prediction_source` label. Added in Phase 4 so an application layer (the
+    FastAPI backend) can warm the models at startup and report their status
+    without reaching into this module's private helpers. Returns the SAME
+    singletons run_unified_analysis uses, so nothing is loaded twice.
+    """
+    return {
+        "phase1_historical_model": _get_default_predictor(),
+        "report_compatible_model": _get_default_report_compatible_predictor(),
+    }
+
+
+def _route_ml_prediction(
+    incident: IncidentReport, phase1_predictor: SeverityPredictor, report_predictor: SeverityPredictor,
+):
+    """Step 14 routing: try Model A first; fall back to Model B only when
+    Model A is genuinely UNAVAILABLE (never because Model A's requirements
+    were weakened -- see ml_adapter.py, unchanged by this function).
+
+    Returns (ml_result, model_a_adapter_result, model_b_adapter_result_or_None, prediction_note_or_None).
+    """
+    model_a_result = adapt_incident_to_ml_features(incident)
+    if model_a_result.feature_row is not None:
+        ml_result = phase1_predictor.predict(model_a_result.feature_row)
+        return ml_result, model_a_result, None, None
+
+    model_b_result = adapt_incident_to_report_compatible_features(incident)
+    if model_b_result.feature_row is not None:
+        ml_result = report_predictor.predict(model_b_result.feature_row)
+        return ml_result, model_a_result, model_b_result, _NOTE_USED_REPORT_COMPATIBLE_MODEL
+
+    ml_result = SeverityPrediction(
+        available=False, prediction_source="none", warnings=[_NOTE_NO_MODEL_AVAILABLE]
+    )
+    return ml_result, model_a_result, model_b_result, _NOTE_NO_MODEL_AVAILABLE
 
 
 def _detect_disagreement(ml_result: SeverityPrediction, decision: DecisionResult) -> Optional[str]:
@@ -124,16 +210,23 @@ def _detect_disagreement(ml_result: SeverityPrediction, decision: DecisionResult
 
 
 def _build_explanation(incident: IncidentReport, decision: DecisionResult, ml_result: SeverityPrediction,
-                        resource_results: List[ResourceSearchResult]) -> ExplanationBundle:
+                        resource_results: List[ResourceSearchResult], prediction_note: Optional[str] = None
+                        ) -> ExplanationBundle:
     ml_reasons: List[str]
     if ml_result.available:
-        ml_reasons = [f"Phase 1 model predicted '{ml_result.predicted_label}' (class {ml_result.predicted_class})."]
+        source_label = {
+            "phase1_historical_model": "Phase 1 historical model",
+            "report_compatible_model": "report-compatible model",
+        }.get(ml_result.prediction_source, ml_result.prediction_source or "model")
+        ml_reasons = [f"{source_label} predicted '{ml_result.predicted_label}' (class {ml_result.predicted_class})."]
         ml_reasons.extend(ml_result.warnings)
     else:
         ml_reasons = list(ml_result.warnings) or [
-            "Phase 1 severity prediction was not generated because the report does not "
-            "provide enough compatible features for the trained model."
+            "No severity prediction was generated because the report does not provide "
+            "enough compatible features for either trained model."
         ]
+    if prediction_note and prediction_note not in ml_reasons:
+        ml_reasons.append(prediction_note)
 
     resource_reasons: List[str] = []
     for result in resource_results:
@@ -163,6 +256,7 @@ def _build_audit(incident: IncidentReport, decision: DecisionResult, adapter_res
         unsupported_ml_features=adapter_result.readiness.unsupported_features,
         ml_prediction_available=ml_result.available,
         ml_predicted_class=ml_result.predicted_class,
+        ml_prediction_source=ml_result.prediction_source or "none",
         risk_indicator_names=[ind.name for ind in incident.risk_indicators],
         priority=decision.priority.value,
         selected_resource_ids=selected_ids,
@@ -179,8 +273,13 @@ def run_unified_analysis(
     source: Optional[str] = None,
     extractor: Optional[BaseReportExtractor] = None,
     severity_predictor: Optional[SeverityPredictor] = None,
+    resource_catalog: Optional[List[Resource]] = None,
 ) -> UnifiedResQAIResult:
     """Run the full ResQAI Phase 3 analysis pipeline on one report.
+
+    `resource_catalog` is an optional, already-loaded demo catalog (Phase 4:
+    lets a long-running server load the CSV once instead of per call). When
+    omitted, resource_engine loads it itself, exactly as before.
 
     Coordinates, in order: Phase 2 parsing (which already runs the risk
     engine and decision engine internally -- see report_parser.py),
@@ -192,27 +291,24 @@ def run_unified_analysis(
 
     incident, decision = parse_report(report_id, raw_text, latitude, longitude, timestamp, source, extractor)
 
-    adapter_result = adapt_incident_to_ml_features(incident)
-    predictor = severity_predictor or _get_default_predictor()
-    if adapter_result.feature_row is not None:
-        ml_result = predictor.predict(adapter_result.feature_row)
-    else:
-        ml_result = SeverityPrediction(
-            available=False,
-            warnings=[
-                "Phase 1 severity prediction was not generated because the report does not "
-                "provide enough compatible features for the trained model."
-            ],
-        )
+    phase1_predictor = severity_predictor or _get_default_predictor()
+    report_predictor = _get_default_report_compatible_predictor()
+    ml_result, model_a_result, model_b_result, prediction_note = _route_ml_prediction(
+        incident, phase1_predictor, report_predictor
+    )
 
     location_assessment = assess_incident_location(incident.latitude, incident.longitude)
     category_values = [c.value for c in decision.recommended_response_categories]
-    resource_results = find_resources_for_categories(category_values, location_assessment.coordinates)
+    resource_results = find_resources_for_categories(
+        category_values, location_assessment.coordinates, resource_catalog
+    )
 
     disagreement = _detect_disagreement(ml_result, decision)
 
     warnings: List[str] = []
-    warnings.extend(adapter_result.readiness.warnings)
+    warnings.extend(model_a_result.readiness.warnings)
+    if model_b_result is not None:
+        warnings.extend(model_b_result.readiness.warnings)
     warnings.extend(w for w in ml_result.warnings if ml_result.available)  # non-available case already explained in ml_reasons
     if location_assessment.reason and not location_assessment.available:
         warnings.append(f"Location: {location_assessment.reason}")
@@ -222,8 +318,8 @@ def run_unified_analysis(
     if disagreement:
         warnings.append(disagreement)
 
-    explanation = _build_explanation(incident, decision, ml_result, resource_results)
-    audit = _build_audit(incident, decision, adapter_result, ml_result, resource_results, warnings)
+    explanation = _build_explanation(incident, decision, ml_result, resource_results, prediction_note)
+    audit = _build_audit(incident, decision, model_a_result, ml_result, resource_results, warnings)
 
     return UnifiedResQAIResult(
         report_id=report_id,
@@ -231,8 +327,11 @@ def run_unified_analysis(
         risk_indicators=incident.risk_indicators,
         priority_decision=decision,
         ml_prediction=ml_result,
-        ml_feature_mappings=adapter_result.mappings,
-        prediction_readiness=adapter_result.readiness,
+        ml_feature_mappings=model_a_result.mappings,
+        prediction_readiness=model_a_result.readiness,
+        report_compatible_feature_mappings=(model_b_result.mappings if model_b_result else None),
+        report_compatible_readiness=(model_b_result.readiness if model_b_result else None),
+        prediction_note=prediction_note,
         location_assessment=location_assessment,
         resource_recommendations=resource_results,
         explanation=explanation,

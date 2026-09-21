@@ -17,3 +17,23 @@ Emergency reports are often unstructured, incomplete, or difficult to prioritize
 ## Vision
 
 To build an intelligent emergency response decision-support platform that can analyze incidents, prioritize emergencies, identify available resources, and assist responders in making effective decisions.
+
+## API (Phase 4)
+
+A FastAPI backend exposes the ResQAI analysis over REST. From the project root:
+
+```powershell
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+.venv\Scripts\python.exe -m uvicorn src.api.main:app --reload
+```
+
+- Interactive docs: http://127.0.0.1:8000/docs (ReDoc at `/redoc`)
+- Health: http://127.0.0.1:8000/api/v1/health
+- Analyze a report: `POST /api/v1/analyze` with `{"raw_text": "..."}` (optional `latitude`, `longitude`, `timestamp`, `report_id`, `source`)
+
+```powershell
+Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/api/v1/analyze" -ContentType "application/json" `
+  -Body '{"raw_text":"Two vehicles collided at an intersection during heavy rain. Traffic is blocked."}'
+```
+
+ResQAI is a decision-support prototype: resources are simulated demo data, no authentication is included, and every result requires human review. See [docs/API.md](docs/API.md) for the full contract.

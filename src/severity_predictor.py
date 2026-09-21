@@ -62,18 +62,35 @@ class SeverityPrediction:
     model_name: str = ""
     model_version: str = ""
     warnings: List[str] = field(default_factory=list)
+    # Phase 3.5 routing fields. `prediction_source` identifies WHICH trained
+    # artifact produced this result -- e.g. "phase1_historical_model" (Model
+    # A, the original full-feature CRSS model) or "report_compatible_model"
+    # (Model B, trained only on report-observable features; see
+    # docs/PHASE3_5_REPORT_READY_ML.md). Set from the SeverityPredictor
+    # instance's own `source_label`, so the SAME wrapper class serves both
+    # models without needing to know Phase 2/adapter semantics itself.
+    prediction_source: str = ""
+    # The exact feature column names that had a non-missing value in the
+    # row actually passed to predict() -- independent of which adapter
+    # produced that row, computed directly from the DataFrame.
+    features_used: List[str] = field(default_factory=list)
 
 
 class SeverityPredictor:
-    """Loads and wraps one trained Phase 1 pipeline for inference-only use."""
+    """Loads and wraps one trained pipeline (Model A or Model B) for
+    inference-only use. The same class serves both models -- only the
+    artifact/metadata paths and `source_label` differ between instances.
+    """
 
     def __init__(
         self,
         model_path: Path = DEFAULT_MODEL_PATH,
         feature_metadata_path: Path = FEATURE_METADATA_PATH,
+        source_label: str = "phase1_historical_model",
     ) -> None:
         self._model_path = Path(model_path)
         self._feature_metadata_path = Path(feature_metadata_path)
+        self._source_label = source_label
         self._pipeline = None
         self._target_labels: Dict[int, str] = {}
         self._expected_columns: List[str] = []
@@ -160,20 +177,30 @@ class SeverityPredictor:
         """
         self._ensure_loaded()
         if self._pipeline is None:
-            return SeverityPrediction(available=False, warnings=[self._load_error or "Model unavailable."])
+            return SeverityPrediction(
+                available=False, prediction_source=self._source_label,
+                warnings=[self._load_error or "Model unavailable."],
+            )
 
         schema_error = self._validate_schema(feature_row)
         if schema_error:
-            return SeverityPrediction(available=False, warnings=[schema_error])
+            return SeverityPrediction(available=False, prediction_source=self._source_label, warnings=[schema_error])
 
         ordered_row = feature_row[self._expected_columns]
         model_name = type(self._pipeline.named_steps["model"]).__name__
+        # Columns with an actual (non-missing) value in the row that was
+        # really passed to the model -- independent of which adapter built
+        # it, computed directly from the data.
+        features_used = [c for c in self._expected_columns if pd.notna(ordered_row.iloc[0][c])]
 
         try:
             predicted_class = int(self._pipeline.predict(ordered_row)[0])
         except Exception as exc:  # noqa: BLE001 -- inference failure must not crash the caller
             logger.warning("Severity model inference failed: %s", exc)
-            return SeverityPrediction(available=False, model_name=model_name, warnings=[f"Model inference failed: {exc}"])
+            return SeverityPrediction(
+                available=False, model_name=model_name, prediction_source=self._source_label,
+                warnings=[f"Model inference failed: {exc}"],
+            )
 
         probabilities = None
         warnings: List[str] = []
@@ -197,6 +224,8 @@ class SeverityPredictor:
             probabilities=probabilities,
             model_name=model_name,
             model_version=self._model_version(),
+            prediction_source=self._source_label,
+            features_used=features_used,
             warnings=warnings,
         )
 

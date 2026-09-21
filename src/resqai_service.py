@@ -18,10 +18,11 @@ Also provides a CLI demo:
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import List, Optional
 
 from .orchestrator import UnifiedResQAIResult, run_unified_analysis
 from .extraction.base import BaseReportExtractor
+from .resource_engine import Resource
 from .severity_predictor import SeverityPredictor
 
 logger = logging.getLogger(__name__)
@@ -36,16 +37,20 @@ def analyze_emergency_report(
     source: Optional[str] = None,
     extractor: Optional[BaseReportExtractor] = None,
     severity_predictor: Optional[SeverityPredictor] = None,
+    resource_catalog: Optional[List[Resource]] = None,
 ) -> UnifiedResQAIResult:
     """Analyze one emergency report end-to-end.
 
     Raises schemas.ReportValidationError if raw_text/report_id are
     invalid. `extractor` and `severity_predictor` are optional
     injection points (e.g. for tests, or a future LLM-based extractor)
-    -- omit both for normal use.
+    -- omit both for normal use. `resource_catalog` is an optional
+    pre-loaded demo catalog (used by the Phase 4 API to avoid re-reading the
+    CSV per request); omit it and the catalog is loaded per call as before.
     """
     return run_unified_analysis(
-        report_id, raw_text, latitude, longitude, timestamp, source, extractor, severity_predictor
+        report_id, raw_text, latitude, longitude, timestamp, source,
+        extractor, severity_predictor, resource_catalog,
     )
 
 
@@ -123,15 +128,23 @@ def _print_result(result: UnifiedResQAIResult) -> None:
         print(f"  {m.feature_name:<24} = {m.value!r:<22} [{m.mapping_type}, {m.certainty.value}]")
 
     print("\nPREDICTION READINESS")
-    print(f"  status: {result.prediction_readiness.status.value}")
-    print(f"  mapped_features ({len(result.prediction_readiness.mapped_features)}): {result.prediction_readiness.mapped_features}")
-    print(f"  missing_features: {result.prediction_readiness.missing_features}")
-    print(f"  unsupported_features: {len(result.prediction_readiness.unsupported_features)} feature(s)")
+    print(f"  Model A (phase1_historical_model): {result.prediction_readiness.status.value}"
+          f"  mapped={len(result.prediction_readiness.mapped_features)}"
+          f"  missing={len(result.prediction_readiness.missing_features)}"
+          f"  unsupported={len(result.prediction_readiness.unsupported_features)}")
+    if result.report_compatible_readiness is not None:
+        print(f"  Model B (report_compatible_model):  {result.report_compatible_readiness.status.value}"
+              f"  mapped={len(result.report_compatible_readiness.mapped_features)}"
+              f" ({result.report_compatible_readiness.mapped_features})")
 
     print("\nML PREDICTION")
+    print(f"  prediction_source: {result.ml_prediction.prediction_source or 'none'}")
+    if result.prediction_note:
+        print(f"  prediction_note: {result.prediction_note}")
     if result.ml_prediction.available:
         print(f"  predicted_severity: {result.ml_prediction.predicted_label} (class {result.ml_prediction.predicted_class})")
         print(f"  model: {result.ml_prediction.model_name} (version {result.ml_prediction.model_version})")
+        print(f"  features_used: {result.ml_prediction.features_used}")
         if result.ml_prediction.probabilities:
             probs = ", ".join(f"{k}={v:.2f}" for k, v in result.ml_prediction.probabilities.items())
             print(f"  probabilities: {probs}")

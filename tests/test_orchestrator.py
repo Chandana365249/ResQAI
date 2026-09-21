@@ -120,17 +120,33 @@ def test_missing_information_report():
     assert result.prediction_readiness.status.value == "unavailable"
 
 
-# 34. Model unavailable (artifact missing) is handled cleanly at the orchestrator level
-def test_model_unavailable_handled_cleanly():
+# 34. Model unavailable is handled cleanly at the orchestrator level.
+# Phase 3.5: Model A's adapter is UNAVAILABLE for this report regardless of
+# whether the passed-in phase1 predictor is broken (the adapter, not the
+# predictor, gates routing) -- so this now legitimately exercises the
+# report-compatible fallback rather than a hard "no prediction" case.
+def test_model_a_unavailable_routes_to_report_compatible_model():
     broken_predictor = SeverityPredictor(model_path="models/does_not_exist.joblib")
     result = run_unified_analysis(
         "s34", "Two cars collided at an intersection during heavy rain.",
         severity_predictor=broken_predictor,
     )
-    assert result.ml_prediction.available is False
-    assert result.ml_prediction.predicted_class is None
+    assert result.prediction_readiness.status.value == "unavailable"
+    assert result.ml_prediction.prediction_source == "report_compatible_model"
+    assert result.prediction_note is not None
     # Whole pipeline still completes and produces a coherent result.
     assert result.priority_decision is not None
+    assert result.human_oversight_required is True
+
+
+def test_no_model_available_when_report_has_almost_no_information():
+    # "Something happened." gives essentially no extractable signal for
+    # EITHER model -- Model B requires at least report_model_adapter.MIN_MAPPED_FEATURES.
+    result = run_unified_analysis("s34b", "Something happened.")
+    assert result.ml_prediction.available is False
+    assert result.ml_prediction.predicted_class is None
+    assert result.ml_prediction.prediction_source == "none"
+    assert result.prediction_note is not None
     assert result.human_oversight_required is True
 
 
@@ -223,3 +239,45 @@ def test_full_pipeline_determinism():
     assert [m.value for m in r1.ml_feature_mappings] == [m.value for m in r2.ml_feature_mappings]
     assert [(r.resource_id, r.distance_km) for s in r1.resource_recommendations for r in s.resources] == \
            [(r.resource_id, r.distance_km) for s in r2.resource_recommendations for r in s.resources]
+
+
+# --- Phase 4 compatibility changes (additive; see docs/API.md, "Changes to existing code") ---
+
+
+def test_get_default_predictors_returns_the_process_wide_singletons():
+    from src import orchestrator
+
+    predictors = orchestrator.get_default_predictors()
+    assert set(predictors) == {"phase1_historical_model", "report_compatible_model"}
+    # same objects run_unified_analysis uses -> nothing is loaded twice
+    assert predictors["phase1_historical_model"] is orchestrator._get_default_predictor()
+    assert predictors["report_compatible_model"] is orchestrator._get_default_report_compatible_predictor()
+
+
+def test_preloaded_resource_catalog_is_used_instead_of_reloading(monkeypatch):
+    from src import resource_engine
+    from src.orchestrator import run_unified_analysis
+
+    catalog = resource_engine.load_resource_catalog()
+
+    def must_not_load(*args, **kwargs):
+        raise AssertionError("catalog was reloaded despite being supplied")
+
+    monkeypatch.setattr(resource_engine, "load_resource_catalog", must_not_load)
+    result = run_unified_analysis(
+        "cat-1", "Two cars collided at an intersection. Four people appear injured.",
+        latitude=39.10, longitude=-94.58, resource_catalog=catalog,
+    )
+    assert result.resource_recommendations
+
+
+def test_resource_catalog_default_behaviour_unchanged():
+    from src.orchestrator import run_unified_analysis
+
+    a = run_unified_analysis("cat-2", "Two cars collided at an intersection.", latitude=39.10, longitude=-94.58)
+    b = run_unified_analysis(
+        "cat-2", "Two cars collided at an intersection.", latitude=39.10, longitude=-94.58,
+        resource_catalog=__import__("src.resource_engine", fromlist=["x"]).load_resource_catalog(),
+    )
+    ids = lambda r: [rec.resource_id for s in r.resource_recommendations for rec in s.resources]
+    assert ids(a) == ids(b)
