@@ -37,3 +37,22 @@ Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/api/v1/analyze" -Cont
 ```
 
 ResQAI is a decision-support prototype: resources are simulated demo data, no authentication is included, and every result requires human review. See [docs/API.md](docs/API.md) for the full contract.
+
+## Dashboard (Phase 5)
+
+A React + TypeScript dashboard (`frontend/`) consumes the API: analyze a report, then see the extracted incident with evidence and certainty, rule-based risk indicators, the ML severity prediction with its source and probabilities, model/rule disagreement warnings, rule-based priority, matched **simulated** demo resources, session analytics, model metrics, and system status. All intelligence stays in the backend; the frontend only presents it.
+
+```powershell
+# terminal 1: backend (project root)
+.venv\Scripts\python.exe -m uvicorn src.api.main:app
+# terminal 2: frontend
+cd frontend
+npm install
+npm run dev          # http://127.0.0.1:5173
+```
+
+Set `VITE_API_BASE_URL` (see `frontend/.env.example`) if the backend is not at `http://127.0.0.1:8000`. To allow a different frontend origin, start the backend with `RESQAI_ALLOWED_ORIGINS`. Frontend tests: `npm test` (90 tests; the live ones need the backend running). Details: [docs/FRONTEND.md](docs/FRONTEND.md).
+
+<!-- Screenshots: add dashboard screenshots here (e.g. docs/images/dashboard-result.png). -->
+
+Resources are synthetic, results are decision support only, and a human must review every analysis.

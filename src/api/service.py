@@ -32,6 +32,7 @@ from ..severity_predictor import SeverityPredictor
 from .config import API_VERSION, SERVICE_NAME
 from .errors import ServiceUnavailableError
 from .logging_utils import log_event
+from .metrics import METRICS_PATHS, load_evaluation
 from .mapping import RESOURCE_NOTICE, filter_resources, model_failed, to_analyze_response, to_demo_resource
 from .schemas.requests import AnalyzeRequest
 from .schemas.responses import (
@@ -39,6 +40,8 @@ from .schemas.responses import (
     ComponentHealth,
     HealthResponse,
     ModelInfoOut,
+    ModelMetricsEntry,
+    ModelMetricsResponse,
     ModelsResponse,
     ReadinessResponse,
     ResourceCatalogResponse,
@@ -59,6 +62,12 @@ _ROUTING_DESCRIPTION = (
     "requires, the report-compatible model is used as a fallback. If neither has enough "
     "report-observable information, no prediction is made (ml_prediction.available=false, "
     "prediction_source='none'). Missing values are never guessed."
+)
+
+_METRICS_NOTE = (
+    "Metrics were computed once at training time on a held-out, stratified 20% test split of NHTSA "
+    "CRSS 2024 crash data (random seed 42). They describe performance on historical crash records, "
+    "not on live emergency reports. Macro metrics weight all five severity classes equally."
 )
 
 # Curated, static descriptions (facts from docs/ML_PIPELINE.md and
@@ -289,6 +298,19 @@ class ResQAIApplicationService:
                 limitations=descriptor["limitations"],
             ))
         return ModelsResponse(models=models, routing=_ROUTING_DESCRIPTION)
+
+    def describe_model_metrics(self) -> ModelMetricsResponse:
+        """Stored training-time evaluation metrics for each model (read-only)."""
+        entries: List[ModelMetricsEntry] = []
+        for source_id, path in METRICS_PATHS.items():
+            evaluation = load_evaluation(path)
+            entries.append(ModelMetricsEntry(
+                source_id=source_id,
+                display_name=_MODEL_DESCRIPTORS[source_id]["display_name"],
+                available=evaluation is not None,
+                evaluation=evaluation,
+            ))
+        return ModelMetricsResponse(models=entries, evaluation_note=_METRICS_NOTE)
 
     @staticmethod
     def _safe_describe(predictor: Optional[SeverityPredictor]) -> Dict[str, object]:

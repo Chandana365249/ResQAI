@@ -16,7 +16,7 @@ def test_openapi_contains_all_required_endpoints(real_api_client):
     schema = r.json()
     paths = schema["paths"]
     assert "post" in paths[f"{API_PREFIX}/analyze"]
-    for path in ("health", "ready", "resources", "models"):
+    for path in ("health", "ready", "resources", "models", "models/metrics"):
         assert "get" in paths[f"{API_PREFIX}/{path}"]
     assert schema["info"]["version"] == API_VERSION
 

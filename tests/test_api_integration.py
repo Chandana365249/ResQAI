@@ -348,3 +348,49 @@ def test_catalog_is_loaded_once_not_per_request(monkeypatch):
             assert client.post("/api/v1/analyze", json={"raw_text": MINOR}).status_code == 200
         client.get("/api/v1/resources")
     assert calls["n"] == 1
+
+
+# ================================================================ GET /models/metrics (Phase 5 addition)
+
+
+def test_model_metrics_endpoint_reports_stored_metrics(real_api_client):
+    import json
+    from pathlib import Path
+
+    r = real_api_client.get("/api/v1/models/metrics")
+    body = r.json()
+    assert r.status_code == 200
+    assert {m["source_id"] for m in body["models"]} == {"phase1_historical_model", "report_compatible_model"}
+    assert "held-out" in body["evaluation_note"]
+    stored = {
+        "phase1_historical_model": json.loads(Path("artifacts/metrics.json").read_text())["random_forest"],
+        "report_compatible_model": json.loads(Path("artifacts/report_compatible_metrics.json").read_text())["random_forest"],
+    }
+    for entry in body["models"]:
+        assert entry["available"] is True
+        ev, raw = entry["evaluation"], stored[entry["source_id"]]
+        # values are passed through from the stored files, not recomputed or altered
+        assert ev["accuracy"] == raw["accuracy"] and ev["macro_f1"] == raw["macro_f1"]
+        assert ev["fatal_class_recall"] == raw["per_class"]["Fatal Injury (K)"]["recall"]
+        assert ev["test_rows"] == sum(int(c["support"]) for c in raw["per_class"].values())
+        assert [c["label"] for c in ev["per_class"]] == list(raw["per_class"])
+    assert ".json" not in r.text and "artifacts" not in r.text  # no filesystem paths
+
+
+def test_model_metrics_missing_file_is_unavailable_not_substituted(monkeypatch):
+    from pathlib import Path
+
+    from src.api import metrics
+
+    monkeypatch.setattr(metrics, "METRICS_PATHS", {
+        "phase1_historical_model": Path("does/not/exist.json"),
+        "report_compatible_model": Path("does/not/exist2.json"),
+    })
+    from src.api import service as service_module
+
+    monkeypatch.setattr(service_module, "METRICS_PATHS", metrics.METRICS_PATHS)
+    with _fake_result_client() as client:
+        r = client.get("/api/v1/models/metrics")
+    assert r.status_code == 200
+    assert all(m["available"] is False and m["evaluation"] is None for m in r.json()["models"])
+    assert "does/not/exist" not in r.text

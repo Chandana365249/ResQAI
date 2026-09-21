@@ -1,0 +1,1 @@
+{"error":{"code":"VALIDATION_ERROR","message":"The request was not valid.","request_id":"e2ba5d5e10694ec98fc4cfe3781502ab","details":[{"field":"raw_text","message":"String should have at least 1 character"}]}}

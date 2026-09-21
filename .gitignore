@@ -20,6 +20,8 @@ __pycache__/
 # --- Secrets / environment files ---
 .env
 .env.*
+# Variable-name-only templates ARE meant to be committed:
+!.env.example
 *.key
 
 # --- OS / editor cruft ---
@@ -30,3 +32,8 @@ Thumbs.db
 
 # --- Notebook checkpoints ---
 .ipynb_checkpoints/
+
+# --- Frontend (Vite/React) ---
+node_modules/
+frontend/dist/
+*.tsbuildinfo

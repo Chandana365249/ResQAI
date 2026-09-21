@@ -57,6 +57,7 @@ At startup (FastAPI lifespan) the app service loads the demo resource catalog on
 | GET | `/api/v1/ready` | Health | `READY` (200) / `NOT_READY` (503) |
 | GET | `/api/v1/resources` | Resources | The **simulated** demo resource catalog (`?resource_type=`, `?availability_status=`) |
 | GET | `/api/v1/models` | Models | Safe metadata for both severity models + routing description |
+| GET | `/api/v1/models/metrics` | Models | Stored training-time evaluation metrics for both models (read-only; added in Phase 5) |
 | GET | `/docs`, `/redoc`, `/openapi.json` | — | Swagger UI, ReDoc, OpenAPI schema |
 
 ## 4. Request schema — `POST /api/v1/analyze`
@@ -325,6 +326,8 @@ Two small, additive, backward-compatible changes to the existing core, each with
 
 `requirements.txt` gained `fastapi`, `uvicorn` and `httpx2` (the test client Starlette now prefers).
 
+**Phase 5 addition:** `GET /api/v1/models/metrics` (`src/api/metrics.py`) exposes the evaluation metrics already written to `artifacts/metrics.json` and `artifacts/report_compatible_metrics.json` at training time, so the dashboard need not hard-code them. It returns, per model: accuracy, macro precision/recall/F1, fatal-class recall, per-class precision/recall/F1/support and test-row count, plus a note that these are held-out CRSS test-split metrics (not live performance). Read-only: nothing is retrained or recalculated, no model file is opened, no path is returned. If a metrics file is missing or malformed, that model's entry is `available: false` with `evaluation: null` (never substituted). Covered by two tests in `tests/test_api_integration.py`.
+
 ## 21. Test matrix
 
 | Endpoint | Valid | Invalid | Edge / degraded |
@@ -336,5 +339,5 @@ Two small, additive, backward-compatible changes to the existing core, each with
 | `POST /analyze` | ✓ (minor, serious, with/without coordinates, 5 E2E reports) | ✓ (missing/blank text, bad lat/lon, too long, bad timestamp, malformed JSON) | ✓ (prediction unavailable, model failure, internal failure → safe 500, service validation → 400, request-id handling, determinism, catalog loaded once, no text in logs) |
 | OpenAPI / CORS | ✓ (all 5 endpoints, tags, examples, allowed vs. disallowed origin) | | |
 
-Test kinds: `tests/test_api_unit.py` (22, **unit**), `tests/test_api_integration.py` (32, **integration**: real-service and fake-service groups), `tests/test_api_contract_and_e2e.py` (12, **contract + end-to-end** against real models).
-Full suite (`pytest -q`): **265 passed** (199 pre-Phase-4 + 66 API).
+Test kinds: `tests/test_api_unit.py` (22, **unit**), `tests/test_api_integration.py` (34, **integration**: real-service and fake-service groups), `tests/test_api_contract_and_e2e.py` (12, **contract + end-to-end** against real models).
+Full suite (`pytest -q`): **267 passed** (199 pre-Phase-4 + 68 API, including the 2 `/models/metrics` tests added in Phase 5).

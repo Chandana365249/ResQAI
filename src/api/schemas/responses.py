@@ -247,3 +247,34 @@ class ModelInfoOut(BaseModel):
 class ModelsResponse(BaseModel):
     models: List[ModelInfoOut]
     routing: str = Field(description="How the analysis endpoint chooses between the models.")
+
+
+class ClassMetricsOut(BaseModel):
+    label: str
+    precision: float
+    recall: float
+    f1: float
+    support: int = Field(description="Number of held-out test rows of this class.")
+
+
+class ModelEvaluationOut(BaseModel):
+    estimator: str = Field(description="The evaluated (deployed) estimator, e.g. 'Random Forest'.")
+    accuracy: float
+    macro_precision: float
+    macro_recall: float
+    macro_f1: float
+    fatal_class_recall: float = Field(description="Recall for the most severe class (Fatal Injury).")
+    test_rows: int
+    per_class: List[ClassMetricsOut]
+
+
+class ModelMetricsEntry(BaseModel):
+    source_id: Literal["phase1_historical_model", "report_compatible_model"]
+    display_name: str
+    available: bool = Field(description="False if this model's stored evaluation metrics could not be read.")
+    evaluation: Optional[ModelEvaluationOut] = None
+
+
+class ModelMetricsResponse(BaseModel):
+    models: List[ModelMetricsEntry]
+    evaluation_note: str
